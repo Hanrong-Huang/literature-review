@@ -1,12 +1,7 @@
 # Setup guide (for the agent)
 
-The user starts this by pasting the prompt from the README:
-
-> Install the literature-review skill from https://github.com/Hanrong-Huang/literature-review
-> and set it up with me. Clone it into my skills folder (Claude Code:
-> `~/.claude/skills/literature-review`), then follow its SETUP.md step by step: run the
-> check, ask me the setup questions, and walk me through getting any API keys I need.
-> Do what you can yourself, and tell me exactly what to click when you can't.
+The user starts this by pasting the setup prompt from the README (English or Chinese).
+Reply in the user's language.
 
 You are setting up this skill for the user. Do every step you can yourself and tell
 the user exactly what to click for the rest. Keep it short: ask one question at a time,

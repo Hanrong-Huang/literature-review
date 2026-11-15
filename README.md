@@ -12,24 +12,45 @@ you:   take 1, 3 and 7
 agent: downloads them: text + figures + tables, PDFs, supplementary files
 ```
 
-## Install: paste this to your agent
+## Install: copy this prompt into Claude Code (or any coding agent)
 
-> Install the literature-review skill from https://github.com/Hanrong-Huang/literature-review
-> and set it up with me. Clone it into my skills folder (Claude Code:
-> `~/.claude/skills/literature-review`), then follow its SETUP.md step by step: run the
-> check, ask me the setup questions, and walk me through getting any API keys I need.
-> Do what you can yourself, and tell me exactly what to click when you can't.
+```text
+Install the literature-review skill from https://github.com/Hanrong-Huang/literature-review and set it up with me.
+1. Clone it into my skills folder (Claude Code: ~/.claude/skills/literature-review; other agents: wherever you keep skills or instructions).
+2. Read its SETUP.md and follow it step by step: run the check, then ask me the setup questions one at a time.
+3. Walk me through the API keys I need and my Zotero setup, if I use Zotero. Open the sign-up pages for me, save keys as permanent environment variables, and never write them into files.
+4. Do everything you can yourself, and tell me exactly what to click when you can't.
+5. Finish with a small test search on my research topic and show me the result.
+```
+
+<details>
+<summary>中文版提示词</summary>
+
+```text
+请从 https://github.com/Hanrong-Huang/literature-review 安装 literature-review skill，并带我完成设置：
+1. 克隆到我的 skills 文件夹（Claude Code 是 ~/.claude/skills/literature-review；其他 agent 放到你存放 skill 或指令的位置）。
+2. 阅读其中的 SETUP.md，按步骤进行：先运行 check，再一次问我一个设置问题。
+3. 带我获取需要的 API key；如果我用 Zotero，也帮我连好本机 Zotero。注册页面由你打开，key 存成永久环境变量，不要写进任何文件。
+4. 你能做的都自己做，做不了的告诉我具体点哪里。
+5. 最后用我的研究方向做一次小检索，给我看结果。
+```
+</details>
 
 The agent installs the skill and asks a few questions: institutional access? which
 publishers? Zotero? It opens the sign-up pages for the keys you want, stores them as
 environment variables, and connects your local Zotero if you use it. In Claude Code
 the skill then triggers on its own when you ask for papers.
 
-Or install it as a Claude Code plugin, then ask Claude to "set up literature-review"
-(it follows the same SETUP.md):
+### Or as a Claude Code plugin
 
 ```
 /plugin install literature-review --marketplace Hanrong-Huang/literature-review
+```
+
+Then paste:
+
+```text
+Set up the literature-review skill with me: follow its SETUP.md step by step, run the check, and ask me the setup questions one at a time.
 ```
 
 On older Claude Code versions, run
