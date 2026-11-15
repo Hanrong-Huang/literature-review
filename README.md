@@ -20,11 +20,10 @@ Install the literature-review skill from https://github.com/Hanrong-Huang/litera
 2. Read its SETUP.md and follow it step by step: run the check, then ask me the setup questions one at a time.
 3. Walk me through the API keys I need and my Zotero setup, if I use Zotero. Open the sign-up pages for me, save keys as permanent environment variables, and never write them into files.
 4. Do everything you can yourself, and tell me exactly what to click when you can't.
-5. Finish with a small test search on my research topic and show me the result.
+5. Finish by running its selftest to check the whole workflow, fix anything that fails, then do a small search on my research topic and show me the result.
 ```
 
-<details>
-<summary>中文版提示词</summary>
+中文版：
 
 ```text
 请从 https://github.com/Hanrong-Huang/literature-review 安装 literature-review skill，并带我完成设置：
@@ -32,9 +31,8 @@ Install the literature-review skill from https://github.com/Hanrong-Huang/litera
 2. 阅读其中的 SETUP.md，按步骤进行：先运行 check，再一次问我一个设置问题。
 3. 带我获取需要的 API key；如果我用 Zotero，也帮我连好本机 Zotero。注册页面由你打开，key 存成永久环境变量，不要写进任何文件。
 4. 你能做的都自己做，做不了的告诉我具体点哪里。
-5. 最后用我的研究方向做一次小检索，给我看结果。
+5. 最后运行 selftest 测试整个流程，有失败的就修好，再用我的研究方向做一次小检索，给我看结果。
 ```
-</details>
 
 The agent installs the skill and asks a few questions: institutional access? which
 publishers? Zotero? It opens the sign-up pages for the keys you want, stores them as
@@ -86,7 +84,8 @@ printed PDFs).
 
 ```bash
 git clone https://github.com/Hanrong-Huang/literature-review ~/.claude/skills/literature-review
-uv run ~/.claude/skills/literature-review/scripts/litflow.py check
+uv run ~/.claude/skills/literature-review/scripts/litflow.py check      # keys and access
+uv run ~/.claude/skills/literature-review/scripts/litflow.py selftest   # whole workflow, PASS/FAIL per step
 ```
 
 Keys are environment variables: `ELSEVIER_API_KEY`, `ELSEVIER_INSTTOKEN`,

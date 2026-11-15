@@ -95,12 +95,29 @@ the plugin is OK. Then papers are added with `fetch ... --collection "<name>"`.
 Also tell the user about one option: `zotero-mcp install-skill --target claude-user`
 adds a companion skill for reading and searching their whole Zotero library.
 
-## 5. Finish
+## 5. Test the whole workflow
 
-1. Run `check` again and walk through the results with the user.
-2. Do a small test together, e.g. `search "<their topic>" -n 5`, then `fetch` two
-   results (with `--collection "litflow test"` if Zotero is set up). Show them the
-   result in Zotero or in the output folder. Without zotero-cli, show how to import
-   `library.ris` (Zotero: File → Import).
-3. Tell them how to update later: `git -C <skill folder> pull`, or the plugin update
-   if they installed it from the marketplace.
+1. Run `selftest`. Without network problems it takes a minute or two. It runs every
+   step on known papers:
+   - search, and related papers;
+   - one full-text download per configured source (open access, Elsevier, Wiley,
+     Springer);
+   - the PDF printed from text;
+   - adding to Zotero and attaching the PDF, and the Find PDF plugin.
+
+   Each step prints PASS, FAIL or SKIP. Downloaded test files are deleted, and the
+   Zotero test item goes to Zotero's trash.
+2. Show the user the table in plain words: what works now, and what is skipped
+   because they chose not to set it up.
+3. Fix each FAIL with the hint on its line, then run `selftest` again:
+   - Elsevier subscription FAIL usually means they're off campus. Connect the VPN, or
+     get `ELSEVIER_INSTTOKEN`.
+   - Wiley or Springer FAIL: re-check the key (section 3).
+   - Zotero FAIL: go back to section 4. Is Zotero running? Is the local API setting
+     ticked? Did they choose Always Allow?
+4. When everything they set up passes, do one real run on their topic:
+   `search "<their topic>" -n 5`, let them pick, and `fetch` with
+   `--collection "<topic>"` (or show how to import `library.ris` without Zotero).
+5. Tell them how to update later: `git -C <skill folder> pull`, or the plugin update
+   if they installed it from the marketplace. If something stops working later,
+   `selftest` is the first thing to run.

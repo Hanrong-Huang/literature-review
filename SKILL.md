@@ -10,6 +10,8 @@ One script does search → pick → download:
 `${CLAUDE_SKILL_DIR}` is this skill's folder, so use that path if your agent doesn't
 fill it in).
 First time here, or `check` shows problems? Follow [SETUP.md](SETUP.md) with the user.
+If something that used to work fails, run `selftest`: it reports PASS, FAIL or SKIP for
+every step, with a hint for each failure.
 
 ## Workflow
 

@@ -10,6 +10,7 @@
   fetch RUN_DIR [--only 1,3,5]            download full text for (some of) a search's results
   fetch --dois DOI [DOI ...]
   ris RUN_DIR                             rebuild library.ris (e.g. after adding PDFs by hand)
+  selftest [--keep]                       run the whole workflow on known papers, report PASS/FAIL
 
 Run with:  uv run <this file> <command> ...      Results go to $LITFLOW_HOME (default ~/litflow).
 
@@ -835,6 +836,97 @@ def cmd_check(_args) -> int:
 
 
 # ------------------------------------------------------------------ main
+# ------------------------------------------------------------------ selftest
+# One known paper per source: (what it tests, DOI, key it needs, what fetch must return)
+SELFTEST = [
+    ("Open access (no key)", "10.1016/j.isci.2018.04.008", None, "pdf"),
+    ("Elsevier subscription", "10.1016/j.ijhydene.2009.08.088", "ELSEVIER_API_KEY", "text+figures"),
+    ("Wiley TDM", "10.1002/er.1284", "WILEY_TDM_TOKEN", "pdf"),
+    ("Springer open access", "10.1007/s10853-020-05509-2", "SPRINGER_OA_API_KEY", "text+figures"),
+]
+HINTS = {"Elsevier subscription": "needs your institution's network/VPN or ELSEVIER_INSTTOKEN",
+         "Wiley TDM": "check the token (Wiley Online Library → TDM)",
+         "Springer open access": "check the key at dev.springernature.com"}
+
+
+def cmd_selftest(args) -> int:
+    """Run the whole workflow on known papers and report PASS / FAIL / SKIP per step."""
+    results: list[tuple[str, str, str]] = []
+
+    def step(name: str, fn) -> None:
+        try:
+            ok, detail = fn()
+            results.append((name, "PASS" if ok else "FAIL", detail))
+        except Exception as e:  # report, don't crash: the point is to see every step
+            results.append((name, "FAIL", f"{type(e).__name__}: {str(e)[:120]}"))
+        log(f"  {results[-1][1]:<4}  {name}")
+
+    tmp = HOME / "runs" / f"selftest-{dt.datetime.now():%Y%m%d-%H%M%S}"
+    log(f"selftest in {tmp}")
+    scopus = bool(KEYS["ELSEVIER_API_KEY"])
+
+    def search():
+        rows = (scopus_search if scopus else openalex_search)("hydrogen storage", 3, None, "relevance")
+        return bool(rows), f"{'Scopus' if scopus else 'OpenAlex'}: {len(rows)} results"
+    step("Search", search)
+    step("Related papers (OpenAlex)",
+         lambda: (lambda r: (bool(r), f"{len(r)} similar papers"))(related(SELFTEST[0][1], 3, "similar")))
+
+    for name, doi, key, want in SELFTEST:
+        if key and not KEYS[key]:
+            results.append((f"Full text: {name}", "SKIP", f"{key} not set"))
+            log(f"  SKIP  Full text: {name}")
+            continue
+        folder = tmp / "papers" / safe_name(doi)
+
+        def fetch(doi=doi, want=want, folder=folder, name=name):
+            x = fetch_one(doi, folder)
+            figs = len(list((folder / "figs").glob("*"))) if (folder / "figs").exists() else 0
+            ok = want in x["got"]
+            detail = x["got"] or x["note"] or "nothing"
+            if figs:
+                detail += f", {figs} figures"
+            if not ok and name in HINTS:
+                detail += f" -> {HINTS[name]}"
+            return ok, detail
+        step(f"Full text: {name}", fetch)
+
+    rendered = list(tmp.glob("papers/*/*.rendered.pdf"))
+    has_text = list(tmp.glob("papers/*/*.md"))
+    if has_text:
+        results.append(("PDF printed from text", "PASS" if rendered else "FAIL",
+                        f"{len(rendered)} file(s)" if rendered else "no Chrome/Edge found, Markdown only"))
+        log(f"  {results[-1][1]:<4}  PDF printed from text")
+
+    if shutil.which("zotero-cli") and (args.zotero or http_ok(ZOTERO + "/connector/ping")):
+        def zotero():
+            doi = SELFTEST[0][1]
+            x = {"doi": doi, "got": "pdf", "zotero": ""}
+            to_zotero(x, tmp / "papers" / safe_name(doi), "litflow-selftest", link=True, find_pdf=False)
+            if not x["zotero"]:
+                return False, "could not add the item (see the message above; SETUP.md section 4)"
+            kids = zcli("get", "children", x["zotero"]).get("data", {}).get("items", [])
+            zcli("delete", "item", x["zotero"])  # clean up: item to Zotero's trash, collection removed
+            cols = zcli("get", "collections").get("data", [])
+            cols = cols if isinstance(cols, list) else cols.get("collections", cols.get("items", []))
+            for c in (c for c in cols if isinstance(c, dict) and c.get("name") == "litflow-selftest"):
+                zcli("delete", "collection", c["key"])
+            return bool(kids), f"item added with {len(kids)} attachment(s), then removed again"
+        step("Zotero: add paper + attach PDF", zotero)
+        results.append(("Zotero: Find PDF plugin", "PASS" if http_ok(FIND_PDF, {"X-Find-PDF": "1"}) else "SKIP",
+                        "installed" if http_ok(FIND_PDF, {"X-Find-PDF": "1"}) else "optional plugin not installed"))
+    else:
+        results.append(("Zotero", "SKIP", "zotero-cli not installed or Zotero not running (library.ris still works)"))
+
+    if not args.keep:
+        shutil.rmtree(tmp, ignore_errors=True)
+    log("\n" + "\n".join(f"{s:<4}  {n:<34} {d}" for n, s, d in results))
+    fails = sum(s == "FAIL" for _, s, _ in results)
+    log(f"\n{'all good' if not fails else f'{fails} step(s) failed'}"
+        f" ({sum(s == 'PASS' for _, s, _ in results)} passed, {sum(s == 'SKIP' for _, s, _ in results)} skipped)")
+    return 1 if fails else 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -866,6 +958,10 @@ def main() -> int:
     p.add_argument("--zotero-import", action="store_true",
                    help="copy files into Zotero storage instead of linking them (uses Zotero cloud quota)")
     p.set_defaults(fn=cmd_fetch)
+    p = sub.add_parser("selftest", help="run the whole workflow on known papers and report what works")
+    p.add_argument("--zotero", action="store_true", help="test Zotero even if it doesn't answer a ping")
+    p.add_argument("--keep", action="store_true", help="keep the downloaded test files")
+    p.set_defaults(fn=cmd_selftest)
     p = sub.add_parser("ris", help="rebuild library.ris for a run")
     p.add_argument("run_dir")
     p.set_defaults(fn=cmd_ris)
