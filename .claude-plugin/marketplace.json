@@ -1,0 +1,16 @@
+{
+  "name": "literature-review-tools",
+  "owner": {
+    "name": "Hanrong-Huang"
+  },
+  "metadata": {
+    "description": "Literature search and full-text download skill for Claude Code"
+  },
+  "plugins": [
+    {
+      "name": "literature-review",
+      "source": "./",
+      "description": "Search the literature and download full text (Elsevier, Wiley, Springer, open access) with figures and tables, into a folder or Zotero"
+    }
+  ]
+}

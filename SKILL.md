@@ -6,7 +6,9 @@ description: Search the scientific literature (Scopus or OpenAlex) and download 
 # Literature review
 
 One script does search → pick → download:
-`uv run <this skill's folder>/scripts/litflow.py <command>` (`--help` lists every option).
+`uv run "${CLAUDE_SKILL_DIR}/scripts/litflow.py" <command>` (`--help` lists every option;
+`${CLAUDE_SKILL_DIR}` is this skill's folder, so use that path if your agent doesn't
+fill it in).
 First time here, or `check` shows problems? Follow [SETUP.md](SETUP.md) with the user.
 
 ## Workflow
@@ -21,17 +23,25 @@ First time here, or `check` shows problems? Follow [SETUP.md](SETUP.md) with the
 3. **Pick**: show the numbered results as a compact table (year, journal, citations,
    one-line gist from the abstract) and recommend which to keep. Wait for the user's
    choice unless they already said "all" or gave clear criteria.
-4. **Fetch**: `fetch <run_dir> --only 1,4,7`, or `fetch --dois <DOI> ...`.
-5. **Report**: how many papers got full text and in what form, the missing ones with
-   the reason, and the path of `library.ris` (in Zotero: File → Import, which attaches
-   the PDFs). Offer to read or summarise the papers; prefer the `.md` files, whose
-   text and tables are cleaner than PDF text.
+4. **Fetch**: `fetch <run_dir> --only 1,4,7`, or `fetch --dois <DOI> ...`. If `check`
+   shows Zotero ready, add `--collection "<topic>"` (nested paths like
+   `Hydrogen/TiFe` work). Each paper then goes straight into the user's Zotero, with
+   its best PDF and the Markdown text attached as linked files. If the Find PDF plugin
+   is installed, Zotero's own *Find Available PDF* is tried first for papers that have
+   no PDF yet.
+5. **Report**: how many papers got full text and in what form, and the missing ones
+   with the reason. Without Zotero, give the path of `library.ris` (in Zotero:
+   File → Import, which attaches the PDFs). Offer to read or summarise the papers;
+   prefer the `.md` files, whose text and tables are cleaner than PDF text.
 6. **Browser fallback**, only if the user wants publisher PDFs that the script couldn't
    get, and only if you have a browser tool. Ask once first, listing the papers.
    - Open `https://doi.org/<DOI>`, decline non-essential cookies, and click the page's
      own PDF / Download button. Use no scripted fetches or other tricks.
    - Save or move the file to `papers/<doi_with_underscores>/<doi_with_underscores>.pdf`
      in the run folder. Check that it starts with `%PDF-`, then run `ris <run_dir>`.
+     With Zotero, attach it instead:
+     `zotero-cli attach <itemKey> --file <pdf> --link`. Then trash the item's
+     `.rendered.pdf` attachment, unless the user has annotated it.
    - **On a CAPTCHA or "are you a robot" page, never solve or bypass it.** Ask the user
      to complete it in the browser, then continue. ScienceDirect usually shows one.
 

@@ -670,6 +670,76 @@ def write_ris(run_dir: Path) -> Path:
     return path
 
 
+# ------------------------------------------------------------------ Zotero (optional, via zotero-cli)
+ZOTERO = "http://127.0.0.1:23119"
+FIND_PDF = ZOTERO + "/claude/find-pdf"  # endpoint of the bundled zotero-plugin (Find Available PDF)
+
+
+def http_ok(url: str, headers: dict | None = None) -> bool:
+    try:
+        return requests.get(url, headers=headers or {}, timeout=5).status_code == 200
+    except requests.RequestException:
+        return False
+
+
+def zcli(*a: str, timeout: int = 300) -> dict:
+    """zotero-cli (from the zotero-mcp-server package) with JSON output."""
+    exe = shutil.which("zotero-cli")
+    if not exe:
+        return {"ok": False, "error": {"message": "zotero-cli is not installed (see SETUP.md)"}}
+    e = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}  # else non-ASCII breaks JSON on Windows
+    for n in ("ZOTERO_API_KEY", "ZOTERO_LIBRARY_ID", "ZOTERO_LIBRARY_TYPE", "ZOTERO_LOCAL"):
+        if n not in e and env(n):
+            e[n] = env(n)
+    e.setdefault("ZOTERO_LOCAL", "true" if http_ok(ZOTERO + "/api/") else "false")
+    try:
+        p = subprocess.run([exe, "--json", *a], capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=timeout, env=e)
+        return json.loads(p.stdout)
+    except (subprocess.TimeoutExpired, json.JSONDecodeError) as err:
+        return {"ok": False, "error": {"message": str(err)[:200]}}
+
+
+def zotero_add(doi: str, collection: str | None) -> str:
+    a = ["add", "doi", doi, "--attach-mode", "none", "--if-exists", "file"]
+    if collection:
+        a += ["-c", collection, "--create-collections"]
+    res = zcli(*a)
+    m = re.search(r"Item key:\s*`?([A-Z0-9]{8})", json.dumps(res.get("data", {}), ensure_ascii=False))
+    if not m:
+        log(f"    ! Zotero: could not add {doi}: {str(res.get('error', res))[:150]}")
+    return m.group(1) if m else ""
+
+
+def zotero_find_pdf(key: str) -> bool:
+    """Zotero's own 'Find Available PDF' through the bundled plugin, if installed."""
+    try:
+        r = requests.post(FIND_PDF, headers={"X-Find-PDF": "1"}, json={"keys": [key]}, timeout=300)
+        res = (r.json().get("results") or [{}])[0]
+        return res.get("status") in ("found", "already_has_file") and "pdf" in str(res.get("type", "pdf"))
+    except (requests.RequestException, ValueError):
+        return False
+
+
+def to_zotero(x: dict, folder: Path, collection: str | None, link: bool, find_pdf: bool) -> None:
+    """Add the paper to Zotero and attach its best PDF and the Markdown text."""
+    key = x["zotero"] = zotero_add(x["doi"], collection)
+    if not key:
+        return
+    stem = safe_name(x["doi"])
+    real = next((p for s in (".pdf", ".accepted.pdf") if (p := folder / f"{stem}{s}").exists()), None)
+    if not real and find_pdf and not x["doi"].lower().startswith(ELSEVIER) and zotero_find_pdf(key):
+        x["got"] = "+".join(filter(None, [x["got"], "zotero-pdf"]))
+        real = True
+    files = [real if isinstance(real, Path) else None, None if real else folder / f"{stem}.rendered.pdf",
+             folder / f"{stem}.md"]
+    have = {k.get("title") for k in zcli("get", "children", key).get("data", {}).get("items", [])}
+    for f in (f for f in files if f and f.exists() and f.name not in have):
+        res = zcli("attach", key, "--file", str(f.resolve()), *(["--link"] if link else []))
+        if not res.get("ok"):
+            log(f"    ! Zotero: attach failed for {f.name}: {str(res.get('error', res))[:150]}")
+
+
 def cmd_fetch(args) -> int:
     if args.dois:
         run_dir = Path(args.out) if args.out else HOME / "runs" / f"{dt.datetime.now():%Y%m%d-%H%M}_dois"
@@ -684,21 +754,28 @@ def cmd_fetch(args) -> int:
         picks = {int(x) for x in re.split(r"[,\s]+", args.only.strip()) if x}
         rows = [r for i, r in enumerate(rows, 1) if i in picks]
     rows = [r for r in rows if r.get("doi")]
-    log(f"fetching {len(rows)} paper(s) into {run_dir / 'papers'}")
+    zotero = args.zotero or args.collection or env("LITFLOW_ZOTERO") == "1"
+    if zotero and not shutil.which("zotero-cli"):
+        sys.exit("--zotero needs zotero-cli (see SETUP.md, 'Zotero'), or drop it and import library.ris")
+    find_pdf = zotero and http_ok(FIND_PDF, {"X-Find-PDF": "1"})
+    log(f"fetching {len(rows)} paper(s) into {run_dir / 'papers'}" + (" and Zotero" if zotero else ""))
     report = []
     for r in rows:
-        x = fetch_one(r["doi"], run_dir / "papers" / safe_name(r["doi"]))
-        x["title"] = r.get("title", "")
+        folder = run_dir / "papers" / safe_name(r["doi"])
+        x = fetch_one(r["doi"], folder)
+        x.update(title=r.get("title", ""), zotero="")
+        if zotero:
+            to_zotero(x, folder, args.collection, link=not args.zotero_import, find_pdf=find_pdf)
         report.append(x)
         log(f"  {r['doi']}: {x['got'] or 'nothing'}" + (f"  ({x['note']})" if x["note"] else ""))
     with open(run_dir / "fetch_report.csv", "w", newline="", encoding="utf-8-sig") as f:
-        w = csv.DictWriter(f, fieldnames=["doi", "title", "got", "note"])
+        w = csv.DictWriter(f, fieldnames=["doi", "title", "got", "note", "zotero"])
         w.writeheader()
         w.writerows(report)
     ris = write_ris(run_dir)
     ok = sum(bool(x["got"]) for x in report)
     log(f"\nfull text for {ok}/{len(report)}.  Report: {run_dir / 'fetch_report.csv'}\nImport into a reference manager: {ris}")
-    no_pdf = [x for x in report if not re.search(r"(^|\+)pdf", x["got"])]
+    no_pdf = [x for x in report if not re.search(r"(^|\+)(zotero-)?pdf", x["got"])]
     if no_pdf:
         log("\nno publisher PDF yet (save one as papers/<doi_with_underscores>/<doi_with_underscores>.pdf, then `ris RUN_DIR`):")
         for x in no_pdf:
@@ -746,6 +823,14 @@ def cmd_check(_args) -> int:
                          params={"q": "keyword:catalysis", "p": 1, "api_key": KEYS["SPRINGER_OA_API_KEY"]}, timeout=30)
         log(f"Springer open access                  : {'OK' if r.status_code == 200 else f'FAILED (http {r.status_code})'}")
     log(f"Wiley TDM                             : {'token set (access is checked per paper)' if KEYS['WILEY_TDM_TOKEN'] else 'no token'}")
+    if shutil.which("zotero-cli"):
+        running = http_ok(ZOTERO + "/connector/ping")
+        cfg = zcli("config").get("data", {}).get("settings", {})
+        writes = "web API key" if (env("ZOTERO_API_KEY") or cfg.get("ZOTERO_API_KEY")) else "local only (Zotero 10+: zotero-mcp authorize-local)"
+        log(f"Zotero (optional)                     : zotero-cli OK; Zotero {'running' if running else 'NOT running'};"
+            f" writes via {writes}; Find PDF plugin {'OK' if http_ok(FIND_PDF, {'X-Find-PDF': '1'}) else 'not installed'}")
+    else:
+        log("Zotero (optional)                     : zotero-cli not installed (library.ris works without it)")
     return 0
 
 
@@ -776,6 +861,10 @@ def main() -> int:
     p.add_argument("--only", help="result numbers, e.g. 1,4,7")
     p.add_argument("--dois", nargs="+")
     p.add_argument("--out")
+    p.add_argument("--zotero", action="store_true", help="also add to Zotero (needs zotero-cli)")
+    p.add_argument("--collection", help="Zotero collection, e.g. 'Hydrogen/TiFe' (implies --zotero)")
+    p.add_argument("--zotero-import", action="store_true",
+                   help="copy files into Zotero storage instead of linking them (uses Zotero cloud quota)")
     p.set_defaults(fn=cmd_fetch)
     p = sub.add_parser("ris", help="rebuild library.ris for a run")
     p.add_argument("run_dir")

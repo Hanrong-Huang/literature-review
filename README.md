@@ -2,8 +2,8 @@
 
 An agent skill for Claude Code (and other coding agents) that searches the scientific
 literature and downloads full text, with figures and tables, from Elsevier, Wiley,
-Springer Nature and open-access sources. You get a folder of papers plus a
-`library.ris` to import into Zotero, EndNote or Mendeley.
+Springer Nature and open-access sources. Papers go straight into your local Zotero,
+or into a folder plus a `library.ris` for Zotero, EndNote or Mendeley.
 
 ```
 you:   find recent papers on TiFe hydrogen storage activation
@@ -20,10 +20,22 @@ agent: downloads them: text + figures + tables, PDFs, supplementary files
 > check, ask me the setup questions, and walk me through getting any API keys I need.
 > Do what you can yourself, and tell me exactly what to click when you can't.
 
-The agent installs the skill, asks two or three questions (institutional access?
-which publishers?), opens the sign-up pages for the keys you want, and stores them as
-environment variables. In Claude Code the skill then triggers on its own when you ask
-for papers.
+The agent installs the skill and asks a few questions: institutional access? which
+publishers? Zotero? It opens the sign-up pages for the keys you want, stores them as
+environment variables, and connects your local Zotero if you use it. In Claude Code
+the skill then triggers on its own when you ask for papers.
+
+Or install it as a Claude Code plugin, then ask Claude to "set up literature-review"
+(it follows the same SETUP.md):
+
+```
+/plugin install literature-review --marketplace Hanrong-Huang/literature-review
+```
+
+On older Claude Code versions, run
+`/plugin marketplace add Hanrong-Huang/literature-review` and then
+`/plugin install literature-review@literature-review-tools`. Plugin updates are
+manual unless you turn on auto-update for this marketplace in `/plugin`.
 
 ## What works with what
 
@@ -33,6 +45,13 @@ for papers.
 | Open-access papers | PMC / Europe PMC / repository PDFs | + Springer Nature OA with figures (Springer key) | |
 | Elsevier subscription papers | | | full text + figures + tables + supplementary files |
 | Wiley subscription papers | | | publisher PDF (Wiley TDM token) |
+
+**Zotero (optional).** With Zotero 10+ running and
+[zotero-cli](https://github.com/54yyyu/zotero-mcp) installed, papers are added to a
+collection you name, with the PDF and the text attached as linked files (they don't
+use your Zotero cloud storage). The bundled `zotero-plugin/` also lets Zotero's own
+*Find Available PDF* run for each new paper. No Zotero account key is needed; a web
+API key is an optional alternative for older Zotero versions.
 
 Elsevier and Springer full text arrive as XML. The skill turns it into Markdown, which
 is ideal for the agent to read, and prints a PDF from it with headless Chrome/Edge for
@@ -59,13 +78,24 @@ Keys are environment variables: `ELSEVIER_API_KEY`, `ELSEVIER_INSTTOKEN`,
 litflow="uv run ~/.claude/skills/literature-review/scripts/litflow.py"
 $litflow search "solid-state hydrogen storage" -n 20 --year-from 2020 --sort cited
 $litflow related 10.1016/j.ijhydene.2018.12.212 --mode citations
-$litflow fetch ~/litflow/runs/<run> --only 1,4,7
+$litflow fetch ~/litflow/runs/<run> --only 1,4,7 --collection "Hydrogen/TiFe"   # into Zotero
 $litflow fetch --dois 10.1002/er.1284 10.1007/s40820-023-01041-5
 ```
 
 ## Updating
 
-`git -C ~/.claude/skills/literature-review pull`
+Clone install: `git -C ~/.claude/skills/literature-review pull`. Plugin install:
+`/plugin`, then *Update now*.
+
+## Layout
+
+```
+SKILL.md                 what the agent does (workflow, sources, output)
+SETUP.md                 guided first-time setup, run by the agent
+scripts/litflow.py       the whole tool, one file (uv installs its two dependencies)
+zotero-plugin/           optional Zotero plugin: Find Available PDF over a local endpoint
+.claude-plugin/          marketplace entry for /plugin install
+```
 
 ## Fair use
 

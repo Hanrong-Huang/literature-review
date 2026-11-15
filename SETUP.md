@@ -33,8 +33,11 @@ and skip anything they don't need.
      to the library, saying the token is for text and data mining via the Elsevier API.
    - No subscription → open-access only. The Springer key is still worth getting.
 2. **"Which publishers matter most for your field?"** Only set up those.
-3. **"Where should downloads go?"** The default is `~/litflow`. To change it, set
-   `LITFLOW_HOME`.
+3. **"Do you use Zotero?"** If yes, do section 4. Otherwise papers go to a folder plus
+   a `library.ris` that any reference manager can import.
+4. **"Where should downloads go?"** The default is `~/litflow`. To change it, set
+   `LITFLOW_HOME`. With Zotero, PDFs stay in this folder as linked files, so pick a
+   folder that won't move.
 
 ## 3. Getting keys (the user does the sign-up)
 
@@ -60,11 +63,49 @@ Never write keys into the repo or any other file.
 If the user would rather not paste keys into chat, give them the command to run
 themselves.
 
-## 4. Finish
+## 4. Zotero (optional)
+
+This puts papers straight into the user's Zotero library, using
+[zotero-cli](https://github.com/54yyyu/zotero-mcp) from the `zotero-mcp-server`
+package. It works with the local Zotero app; no Zotero account key is needed.
+
+1. Check that Zotero is version 10 or newer (Help → About Zotero). If it's older,
+   ask the user to update, or use the optional web API route in step 6.
+2. Ask the user to open Zotero → Settings → Advanced and tick **"Allow other
+   applications on this computer to communicate with Zotero"**. Check it with
+   `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:23119/api/`, which
+   should print `200`.
+3. Install the CLI: `uv tool install zotero-mcp-server`. If that fails on a new
+   Python, add `--python 3.12`. Check with `zotero-cli --help`.
+4. Allow it to write. First save `ZOTERO_LOCAL=true` as a permanent environment
+   variable (as in section 3); without it, `authorize-local` refuses to run. Then
+   run `zotero-mcp authorize-local` in a shell where `ZOTERO_LOCAL=true` is set.
+   Zotero shows a dialog, which may open behind other windows. Ask the user to bring
+   Zotero to the front and click **Always Allow** within two minutes.
+   `zotero-mcp authorize-local --status` should then say writes go to the local API.
+5. Optional but recommended: the *Find PDF* plugin bundled here lets Zotero's own
+   *Find Available PDF* run for each new paper. Ask the user to open Zotero →
+   Tools → Plugins → gear icon → **Install Plugin From File…** and choose
+   `zotero-plugin/find-pdf-endpoint.xpi` from this skill's folder. Show them the full
+   path. Then make sure the plugin is enabled in that list.
+6. Optional: the web API route works with any Zotero version and while Zotero is
+   closed. The user creates a key with write access at
+   https://www.zotero.org/settings/keys (their numeric user ID is shown on that
+   page). Save the key as `ZOTERO_API_KEY` and the ID as `ZOTERO_LIBRARY_ID`.
+   Mention it; don't push it.
+
+Run `check`. The Zotero line should say "running", show how writes go, and say whether
+the plugin is OK. Then papers are added with `fetch ... --collection "<name>"`.
+
+Also tell the user about one option: `zotero-mcp install-skill --target claude-user`
+adds a companion skill for reading and searching their whole Zotero library.
+
+## 5. Finish
 
 1. Run `check` again and walk through the results with the user.
 2. Do a small test together, e.g. `search "<their topic>" -n 5`, then `fetch` two
-   results. Show them the output folder and how to import `library.ris` into Zotero
-   (File → Import → choose the file; choose "link to files" if their Zotero cloud
-   storage is small).
-3. Tell them how to update later: `git -C <skill folder> pull`.
+   results (with `--collection "litflow test"` if Zotero is set up). Show them the
+   result in Zotero or in the output folder. Without zotero-cli, show how to import
+   `library.ris` (Zotero: File → Import).
+3. Tell them how to update later: `git -C <skill folder> pull`, or the plugin update
+   if they installed it from the marketplace.
