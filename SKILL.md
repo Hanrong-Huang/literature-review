@@ -17,7 +17,8 @@ every step, with a hint for each failure.
 
 1. **Check**: run `check`. It shows which keys are set and what full text actually
    works from this network. If Elsevier subscription full text says "no" and the user
-   has institutional access, suggest their campus network or VPN.
+   has institutional access, suggest their campus network or VPN. Without either, a
+   browser signed in to their institution can still get the PDFs (step 6).
 2. **Search**: `search "<query>" -n 20`, adding `--year-from` or `--sort cited|date`
    when useful. It uses Scopus when an Elsevier key is set (plain words become
    `TITLE-ABS-KEY(...)`; full Scopus syntax works) and OpenAlex otherwise. To expand
@@ -37,15 +38,23 @@ every step, with a hint for each failure.
    prefer the `.md` files, whose text and tables are cleaner than PDF text.
 6. **Browser fallback**, only if the user wants publisher PDFs that the script couldn't
    get, and only if you have a browser tool. Ask once first, listing the papers.
-   - Open `https://doi.org/<DOI>`, decline non-essential cookies, and click the page's
-     own PDF / Download button. Use no scripted fetches or other tricks.
-   - Save or move the file to `papers/<doi_with_underscores>/<doi_with_underscores>.pdf`
-     in the run folder. Check that it starts with `%PDF-`, then run `ris <run_dir>`.
+   - Prefer the user's own browser (e.g. Claude in Chrome): it carries their
+     institutional sign-in, so it works off campus without a VPN. Ask them to set it to
+     download PDFs (Chrome: `chrome://settings/content/pdfDocuments`), since a built-in
+     PDF viewer usually can't be driven.
+   - Open `https://doi.org/<DOI>` and decline non-essential cookies. If the page offers
+     "Access through <institution>", click it: an existing single sign-on passes without
+     a password. Never type a password; if a login page appears, ask the user. Then
+     click the page's own PDF / Download button. Use no scripted fetches or other tricks.
+   - Find the new file by comparing the downloads folder before and after. Save or move
+     it to `papers/<doi_with_underscores>/<doi_with_underscores>.pdf` in the run folder.
+     Check that it starts with `%PDF-` and the page count fits, then run `ris <run_dir>`.
      With Zotero, attach it instead:
      `zotero-cli attach <itemKey> --file <pdf> --link`. Then trash the item's
      `.rendered.pdf` attachment, unless the user has annotated it.
    - **On a CAPTCHA or "are you a robot" page, never solve or bypass it.** Ask the user
-     to complete it in the browser, then continue. ScienceDirect usually shows one.
+     to complete it in the browser, then continue. ScienceDirect usually shows one, once
+     per browser.
 
 ## What each source gives
 

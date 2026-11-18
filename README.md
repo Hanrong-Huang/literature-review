@@ -75,7 +75,9 @@ API key is an optional alternative for older Zotero versions.
 Elsevier and Springer full text arrive as XML. The skill turns it into Markdown, which
 is ideal for the agent to read, and prints a PDF from it with headless Chrome/Edge for
 you to read. Publisher-typeset PDFs that the APIs don't serve can be fetched in a
-browser by the agent (with your OK), and you solve any CAPTCHA yourself.
+browser by the agent (with your OK), and you solve any CAPTCHA yourself. In your own
+browser (e.g. Claude in Chrome) your institutional sign-in works off campus too, with
+no VPN.
 
 ## Manual install
 
